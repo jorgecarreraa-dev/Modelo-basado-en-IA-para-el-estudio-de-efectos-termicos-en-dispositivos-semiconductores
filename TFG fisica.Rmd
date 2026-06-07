@@ -1,0 +1,1396 @@
+---
+title: "TFG Fisica"
+author: "Jorge Carrera Pérez"
+date: "2025-02-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+```{r,include=FALSE}
+install.packages('plotly')
+install.packages('randomForest')
+install.packages('neuralnet')
+
+library(plotly)
+library(ggplot2)
+library(dplyr)
+library(randomForest)
+library(neuralnet)
+```
+
+
+```{r construccion de la tabla de datos}
+
+Vgs<-c("-5.0","-4.8","-4.6","-4.2","-4.0","-3.8","-3.6","-3.4","-3.2","-3.0","-2.8","-2.6","-2.4","-2.2","-2.0","-1.8","-1.6","-1.4","-1.2","-1.0")
+Temperatura<-c("250.0","300.0","350.0","400.0","450.0","500.0")
+Vds<-c("0.0","0.05","0.1","0.15","0.2","0.25","0.3","0.35","0.4","0.45","0.5","1.0","1.5","2.0","2.5","3.0","3.5","4.0","4.5","5.0","5.5","6.0","6.5","7.0","7.5","8.0","8.5","9.0","9.5","10.0","10.5","11.0","11.5","12.0","12.5","13.0","13.5","14.0","14.5","15.0","15.5","16.0","16.5","17.0","17.5","18.0","18.5","19.0","19.5","20.0","20.5","21.0","21.5","22.0","22.5","23.0","23.5","24.0","24.5","25.0")
+
+descartar=50001
+
+ruta_carpetas<-"C:/Users/Asus/OneDrive/Desktop/Doble grado física y mates/Quinto/Segundo cuatrimestre/Tfg Física"
+carpetasTemperatura <- list.dirs(ruta_carpetas, recursive = FALSE)  # el recursive es para obtener solo las carpetas de primer nivel, es decir, sin las subcarpetas
+
+
+#con el gsub eliminamos el/ entre vgs y los valores por como la hemos concatenado
+
+tabla<-data.frame()
+for(k in Temperatura){
+ for(i in Vgs){
+   for (j in Vds){
+
+    ruta_completa1<-file.path(ruta_carpetas,"temperatura",k,"vgs",i,"vds",j,"CORR01")
+    ruta_completa2<-gsub("/temperatura/","/temperatura",ruta_completa1)
+    ruta_completa3<-gsub("/vgs/","/vgs",ruta_completa2)
+    ruta_completa<-gsub("/vds/","/vds",ruta_completa3)
+    leer1<-read.table(ruta_completa,header = FALSE)
+    corriente1<-leer1[,2]
+    corriente2<-corriente1[descartar:length(corriente1)]
+    
+#para hacer la tabla vamos a ir añadiendo cada una de las filas el valor para cada i,j,k
+    if(dim(tabla)[1]==0){
+      tabla<-data.frame(Vds=j,Vgs=i,Id=mean(corriente2),temperatura=k)
+    }
+    else{
+      tabla<-rbind(tabla,data.frame(Vds=j,Vgs=i,Id=mean(corriente2),temperatura=k))
+    }
+  }
+ }
+}
+tabla$Vds=as.numeric(tabla$Vds)
+tabla$Vgs=as.numeric(tabla$Vgs)
+tabla$temperatura=as.numeric((tabla$temperatura))
+
+#cargo los datos del tablón entero lo anterior es para cargarlo desde los ficheros
+tablacompleta<-read.csv("C:/Users/Asus/OneDrive/Desktop/Doble grado física y mates/Quinto/Segundo cuatrimestre/Tfg Física/IVs",header=TRUE,sep=";")
+tablacompleta$Vds=as.numeric(tablacompleta$Vds)
+tablacompleta$Vgs=as.numeric(tablacompleta$Vgs)
+tablacompleta$temperatura=as.numeric((tablacompleta$temperatura))
+summary(tablacompleta$Id)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r Curvas de salida, echo=FALSE}
+#Vamos a representar aquí las curvas de salida del tablón de datos para las distintas temperauras
+graficos<-list()
+Temperatura<-c("300.0","310.0","320.0","330.0","340.0","350.0","360.0","370.0","380.0","390.0","400.0","410.0","420.0","430.0","440.0","450.0","460.0","470.0","480.0","490.0","500.0","510.0","520.0","530.0","540.0","550.0","560.0","570.0","580.0","590.0","600.0")
+for(i in Temperatura){
+  datos=tablacompleta[tablacompleta$temperatura==as.numeric(i),]
+  grafico<-plot_ly(data=datos,x=~Vds,y=~Id,mode='markers+lines',type = "scatter", split=~Vgs)%>%
+    layout(title =list(text= paste("Temperatura:", i,"K"),font=(list(size=16))),
+                xaxis = list(title = "Vds (V)",titlefont = list(size = 16), tickfont = list(size = 16)),
+                yaxis = list(title = "Id (A/m)",titlefont = list(size = 16), tickfont = list(size = 16)),
+           legend = list(
+        title = list(text = "  Vgs (V) ", font = list(size = 14)),font = list(size = 12),x = 1.05, y = 1,
+        bgcolor = '#F9F9F9',bordercolor = '#ccc',borderwidth = 1),
+        annotations = list(
+  list(
+    x = 0.05,
+    y = 1.05,
+    text = "   (d)  ",
+    xref = "paper", yref = "paper",  # posiciona con relación al gráfico
+    showarrow = FALSE,
+    font = list(size = 16)
+  )
+             ))
+  graficos <- append(graficos, list(grafico))
+}
+htmltools::tagList(graficos)
+```
+
+
+```{r datos para entrenar y testear o validar los modelos}
+
+#lo primero que hacemos es normalizar 
+#debemos guardar maximo,minimo de cada columna para desnormalizar desspues
+maxVds<-max(tablacompleta$Vds)
+minVds<-min(tablacompleta$Vds)
+maxVgs<-max(tablacompleta$Vgs)
+minVgs<-min(tablacompleta$Vgs)
+maxtemp<-max(tablacompleta$temperatura)
+mintemp<-min(tablacompleta$temperatura)
+maxId<-max(tablacompleta$Id)
+minId<-min(tablacompleta$Id)
+
+min_max_norm <- function(x) {return((x - min(x)) / (max(x) - min(x)))}
+columnas_a_normalizar <- c("Vds", "Vgs", "temperatura","Id")
+
+# Aplicamos la normalización solo a esas columnas 
+tablanorm <- as.data.frame(lapply(tablacompleta[columnas_a_normalizar], min_max_norm))
+#para realizar los modelos predictivos vamos a quedarnos con el 80% de los datos para entrenar y con el %20 para validar los modelos
+
+set.seed(123)  # Fijamos la semilla para reproducibilidad
+
+n <- nrow(tablanorm)
+indices_80 <- sample(1:n, size = 0.8 * n)
+
+# Crear la tabla con el 80% de los datos
+train<- tablanorm[indices_80, ]
+
+#Creamos la tabla con el 20%restante
+test<-tablanorm[-indices_80,]
+
+
+```
+
+```{r ajuste lineal múltiple}
+set.seed(123)
+modeloajustelineal<-lm(Id~.,data=train)
+
+
+#vamos ahora a predecir ahora con este modelo
+
+tablanorm$prediccionesajustelineal <- NA 
+tablanorm$prediccionesajustelineal[-indices_80] <- predict(modeloajustelineal,newdata = test)
+tablanorm$prediccionesajustelineal[indices_80] <- predict(modeloajustelineal,newdata = train)
+
+#cálculo de las métricas
+MAEtrain<-mean(abs(train$Id-tablanorm$prediccionesajustelineal[indices_80]))
+RMSEtrain<-sqrt(mean((train$Id-tablanorm$prediccionesajustelineal[indices_80])^2))
+MAEtest<-mean(abs(test$Id-tablanorm$prediccionesajustelineal[-indices_80]))
+RMSEtest<-sqrt(mean((test$Id-tablanorm$prediccionesajustelineal[-indices_80])^2))
+coeficienteR2train<-1-(sum((train$Id - tablanorm$prediccionesajustelineal[indices_80])^2)/sum((train$Id - mean(train$Id))^2))
+coeficienteR2test<-1-(sum((test$Id - tablanorm$prediccionesajustelineal[-indices_80])^2)/sum((test$Id - mean(test$Id))^2))
+  
+#comparación del testeo y del train
+ggplot(data = NULL, aes(x = train$Id, y = tablanorm$prediccionesajustelineal[indices_80])) +
+  geom_point(size = 0.5) +geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red", size = 0.8)+
+  labs(title = "Testeo datos TRAIN", x = "Corriente MC normalizada", y = "Corriente ajuste lineal normalizada") +annotate("text", x = 0.05, y = 1.05, label = " (a)  ", size = 6,hjust = 0, vjust = 1, fontface = "bold", color = "black")+
+  theme(
+    axis.text = element_text(size = 14), 
+    axis.title = element_text(size=16),
+    plot.title = element_text(size = 18),
+    panel.background = element_rect(fill = "white"),    
+    plot.background = element_rect(fill = "white"),     
+    panel.grid.major = element_line(color = "grey90"),)
+ggplot(data = NULL, aes(x = test$Id, y = tablanorm$prediccionesajustelineal[-indices_80])) +
+  geom_point(size = 0.5) +geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red", size = 0.8)+
+  labs(title = "Testeo datos TEST", x = "Corriente MC normalizada", y = "Corriente ajuste lineal normalizada") +annotate("text", x = 0.05, y = 1.05, label = " (b)  ", size = 6,hjust = 0, vjust = 1, fontface = "bold", color = "black")+
+  theme(
+    axis.text = element_text(size = 14), 
+    axis.title = element_text(size=16),
+    plot.title = element_text(size = 18),
+    panel.background = element_rect(fill = "white"),    
+    plot.background = element_rect(fill = "white"),     
+    panel.grid.major = element_line(color = "grey90"))
+
+
+```
+
+
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r Random Forest}
+set.seed(123)
+modeloRandomForest<-randomForest(Id~temperatura+Vds+Vgs,data=train,ntree=100)
+
+print(modeloRandomForest)
+
+tablanorm$prediccionesrandomForest <- NA 
+tablanorm$prediccionesrandomForest[-indices_80] <- predict(modeloRandomForest,newdata = test)
+tablanorm$prediccionesrandomForest[indices_80] <- predict(modeloRandomForest,newdata = train)
+
+#cálculo de las métricas
+MAEtrain<-mean(abs(train$Id-tablanorm$prediccionesrandomForest[indices_80]))
+RMSEtrain<-sqrt(mean((train$Id-tablanorm$prediccionesrandomForest[indices_80])^2))
+MAEtest<-mean(abs(test$Id-tablanorm$prediccionesrandomForest[-indices_80]))
+RMSEtest<-sqrt(mean((test$Id-tablanorm$prediccionesrandomForest[-indices_80])^2))
+coeficienteR2train<-1-(sum((train$Id - tablanorm$prediccionesrandomForest[indices_80])^2)/sum((train$Id - mean(train$Id))^2))
+coeficienteR2test<-1-(sum((test$Id - tablanorm$prediccionesrandomForest[-indices_80])^2)/sum((test$Id - mean(test$Id))^2))
+
+
+#comparación del testeo y del train
+ggplot(data = NULL, aes(x = train$Id, y = tablanorm$prediccionesrandomForest[indices_80])) +
+  geom_point(size = 0.5) +geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red", size = 0.8)+
+  labs(title = "Testeo datos TRAIN", x = "Corriente MC normalizada", y = "Corriente Random Forest normalizada") +annotate("text", x = 0.05, y = 1.05, label = " (a)  ", size = 6,hjust = 0, vjust = 1, fontface = "bold", color = "black")+
+  theme(axis.text = element_text(size = 14), 
+    axis.title = element_text(size=16),
+    plot.title = element_text(size = 18),
+    panel.background = element_rect(fill = "white"),    
+    plot.background = element_rect(fill = "white"),     
+    panel.grid.major = element_line(color = "grey90"))
+ggplot(data = NULL, aes(x = test$Id, y = tablanorm$prediccionesrandomForest[-indices_80])) +
+  geom_point(size = 0.5) +geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red", size = 0.8)+
+  labs(title = "Testeo datos TEST", x = "Corriente MC normalizada", y = "Corriente Random Forest normalizada") +annotate("text", x = 0.05, y = 1.05, label = " (b)  ", size = 6,hjust = 0, vjust = 1, fontface = "bold", color = "black") +
+  theme(axis.text = element_text(size = 14), 
+    axis.title = element_text(size=16),
+    plot.title = element_text(size = 18),
+    panel.background = element_rect(fill = "white"),    
+    plot.background = element_rect(fill = "white"),     
+    panel.grid.major = element_line(color = "grey90"))
+
+
+```
+
+
+```{r red neuronal}
+
+
+set.seed(123)
+#Entrenamos nuestra red neuronal
+model_rnn<-neuralnet(Id~.,train,hidden=c(10,10,10),threshold=0.003,lifesign = "full",stepmax=1e+06,rep=3)
+#redneuronal <- neuralnet(Id ~ Vds+temperatura+Vgs, train, hidden = c(10,10,10), threshold=0.001,stepmax=1e+06,linear.output = TRUE,rep=3,lifesign = "full")
+#linear.output=TRUE asumimos que Id es continua y se ha escogido el número de neuronas como 3 veces las entradas + la salida y usamos tres capas
+
+#plotear la red
+plot(model_rnn,rep = "best")
+
+#para hacer predicciones con el paquete neuralnet debemos usar compute no predict
+
+tablanorm$prediccionesredneuronal <- NA 
+tablanorm$prediccionesredneuronal[-indices_80] <-predict(model_rnn,newdata = test)
+tablanorm$prediccionesredneuronal[indices_80] <-predict(model_rnn,newdata=train)
+
+#cálculo de las métricas
+MAEtrain<-mean(abs(train$Id-tablanorm$prediccionesredneuronal[indices_80]))
+RMSEtrain<-sqrt(mean((train$Id-tablanorm$prediccionesredneuronal[indices_80])^2))
+MAEtest<-mean(abs(test$Id-tablanorm$prediccionesredneuronal[-indices_80]))
+RMSEtest<-sqrt(mean((test$Id-tablanorm$prediccionesredneuronal[-indices_80])^2))
+coeficienteR2train<-1-(sum((train$Id - tablanorm$prediccionesredneuronal[indices_80])^2)/sum((train$Id - mean(train$Id))^2))
+coeficienteR2test<-1-(sum((test$Id - tablanorm$prediccionesredneuronal[-indices_80])^2)/sum((test$Id - mean(test$Id))^2))
+
+#comparación del testeo y del train
+ggplot(data = NULL, aes(x = train$Id, y = tablanorm$prediccionesredneuronal[indices_80])) +
+  geom_point(size = 0.5) +geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red", size = 0.8)+
+  labs(title = "Testeo datos TRAIN", x = "Corriente MC normalizada", y = "Corriente red neuronal normalizada") + annotate("text", x = 0.05, y = 1.05, label = " (a)  ", size = 6,hjust = 0, vjust = 1, fontface = "bold", color = "black")+
+  theme(axis.text = element_text(size = 14), 
+    axis.title = element_text(size=16),
+    plot.title = element_text(size = 18),
+    panel.background = element_rect(fill = "white"),    
+    plot.background = element_rect(fill = "white"),     
+    panel.grid.major = element_line(color = "grey90"))
+ggplot(data = NULL, aes(x = test$Id, y = tablanorm$prediccionesredneuronal[-indices_80])) +
+  geom_point(size = 0.5) +geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red", size = 0.8)+
+  labs(title = "Testeo datos TEST", x = "Corriente MC normalizada", y = "Corriente red neuronal normalizada") +annotate("text", x = 0.05, y = 1.05, label = " (b)  ", size = 6,hjust = 0, vjust = 1, fontface = "bold", color = "black")+
+  theme(axis.text = element_text(size = 14), 
+    axis.title = element_text(size=16),
+    plot.title = element_text(size = 18),
+    panel.background = element_rect(fill = "white"),    
+    plot.background = element_rect(fill = "white"),     
+    panel.grid.major = element_line(color = "grey90"))
+
+
+
+```
+
+```{r  comparacion datos y predicciones para red neuronal}
+#lo primero que hacemos es desnormalizar las predicciones del id de nuestro tablón
+
+
+tablanorm$Vgs<-tablanorm$Vgs*(maxVgs-minVgs)+minVgs
+tablanorm$Vds<-tablanorm$Vds*(maxVds-minVds)+minVds
+tablanorm$temperatura<-tablanorm$temperatura*(maxtemp-mintemp)+mintemp
+tablanorm$prediccionesajustelineal<-tablanorm$prediccionesajustelineal*(maxId-minId)+minId
+tablanorm$prediccionesrandomForest<-tablanorm$prediccionesrandomForest*(maxId-minId)+minId
+tablanorm$prediccionesredneuronal<-tablanorm$prediccionesredneuronal*(maxId-minId)+minId
+tablanorm$Id<-tablanorm$Id*(maxId-minId)+minId
+
+
+
+getwd()
+write.csv(tablanorm, "tablonnormalizado.csv", row.names = FALSE)
+
+#comparamos ambos gráficos
+graficoredneuronal<-list()
+for(i in Temperatura){
+  datos=tablanorm[tablanorm$temperatura==as.numeric(i),]
+  datos1=tablacompleta[tablacompleta$temperatura==as.numeric(i),]
+  datos1$Vgs=as.character(datos1$Vgs)
+  datos$Vgs=as.character(datos$Vgs)
+  grafico <-plot_ly()
+  grafico<-grafico%>%layout(title =list(text= paste("Temperatura:", i,"K"),font=(list(size=16))),
+                xaxis = list(title = "Vds (V)",titlefont = list(size = 16), tickfont = list(size = 16)),
+                yaxis = list(title = "Id (A/m)",titlefont = list(size = 16), tickfont = list(size = 16)),
+           legend = list(
+        title = list(text = "  Vgs (V) ", font = list(size = 14)),font = list(size = 12),x = 1.05, y = 1,
+        bgcolor = '#F9F9F9',bordercolor = '#ccc',borderwidth = 1),
+        annotations = list(
+  list(
+    x = 0.05,
+    y = 1.05,
+    text = "   (c)  ",
+    xref = "paper", yref = "paper",  # posiciona con relación al gráfico
+    showarrow = FALSE,
+    font = list(size = 16)
+  )
+             )
+             )
+  grafico<-grafico%>%add_trace(data=datos,x=~Vds,y=~prediccionesredneuronal,mode='markers',type = "scatter", color=~Vgs)
+  
+  grafico<-grafico%>%add_trace(data = datos1, x = ~Vds, y = ~Id, mode = 'lines', type = 'scatter',color=~Vgs)
+  
+  
+  graficoredneuronal <- append(graficoredneuronal, list(grafico))
+}
+
+
+htmltools::tagList(graficoredneuronal)
+```
+
+```{r comparacion datos y predicciones ajuste lineal múltiple }
+
+graficoajustelineal<-list()
+for(i in Temperatura){
+  datos=tablanorm[tablanorm$temperatura==as.numeric(i),]
+  datos1=tablacompleta[tablacompleta$temperatura==as.numeric(i),]
+  datos1$Vgs=as.character(datos1$Vgs)
+  datos$Vgs=as.character(datos$Vgs)
+  grafico <-plot_ly()%>%
+    add_trace(data=datos,x=~Vds,y=~prediccionesajustelineal,mode='markers',type = "scatter", color=~Vgs)%>%
+    add_trace(data = datos1, x = ~Vds, y = ~Id, mode = 'lines', type = 'scatter',color=~Vgs) %>%
+    layout(title =list(text= paste("Temperatura:", i,"K"),font=(list(size=16))),
+                xaxis = list(title = "Vds (V)",titlefont = list(size = 16), tickfont = list(size = 16)),
+                yaxis = list(title = "Id (A/m)",titlefont = list(size = 16), tickfont = list(size = 16)),
+           legend = list(
+        title = list(text = "  Vgs (V) ", font = list(size = 14)),font = list(size = 12),x = 1.05, y = 1,
+        bgcolor = '#F9F9F9',bordercolor = '#ccc',borderwidth = 1),
+        annotations = list(
+  list(
+    x = 0.05,
+    y = 1.05,
+    text = "   (a)  ",
+    xref = "paper", yref = "paper",  # posiciona con relación al gráfico
+    showarrow = FALSE,
+    font = list(size = 16)
+  )
+             )
+             )
+  graficoajustelineal <- append(graficoajustelineal, list(grafico))
+}
+
+
+htmltools::tagList(graficoajustelineal)
+```
+
+```{r randomForest gráficos comparando con la original}
+
+graficorandomForest<-list()
+for(i in Temperatura){
+  
+  datos=tablanorm[tablanorm$temperatura==as.numeric(i),]
+  datos1=tablacompleta[tablacompleta$temperatura==as.numeric(i),]
+  datos1$Vgs=as.character(datos1$Vgs)
+  datos$Vgs=as.character(datos$Vgs)
+  grafico <-plot_ly()%>%
+    add_trace(data=datos,x=~Vds,y=~prediccionesrandomForest,mode='markers',type = "scatter", color=~Vgs)%>%
+    add_trace(data = datos1, x = ~Vds, y = ~Id, mode = 'lines', type = 'scatter',color=~Vgs) %>%
+    layout(title =list(text= paste("Temperatura:", i,"K"),font=(list(size=16))),
+                xaxis = list(title = "Vds (V)",titlefont = list(size = 16), tickfont = list(size = 16)),
+                yaxis = list(title = "Id (A/m)",titlefont = list(size = 16), tickfont = list(size = 16)),
+           legend = list(
+        title = list(text = "  Vgs (V) ", font = list(size = 14)),font = list(size = 12),x = 1.05, y = 1,
+        bgcolor = '#F9F9F9',bordercolor = '#ccc',borderwidth = 1),
+        annotations = list(
+  list(
+    x = 0.05,
+    y = 1.05,
+    text = "   (b)  ",
+    xref = "paper", yref = "paper",  # posiciona con relación al gráfico
+    showarrow = FALSE,
+    font = list(size = 16)
+  )
+             )
+             )
+  graficorandomForest <- append(graficorandomForest, list(grafico))
+}
+
+
+htmltools::tagList(graficorandomForest)
+
+```
+
+```{r modelo híbrido TRM1}
+
+#cargo los datos de los ficheros que tienen los datos con las simulaciones MC
+
+modeloRTH<-read.csv("C:/Users/Asus/OneDrive/Desktop/Doble grado física y mates/Quinto/Segundo cuatrimestre/Tfg Física/RTHMODELO",header=TRUE,sep=";")
+
+modeloRTH$Vds=as.numeric(modeloRTH$Vds)
+modeloRTH$Vgs=as.numeric(modeloRTH$Vgs)
+modeloRTH$temperatura=as.numeric((modeloRTH$temperatura))
+modeloRTH$Id=as.numeric((modeloRTH$Id))
+
+
+Vgs<-c(-1,-2,-3,-4)
+Vds<-c("0.0","0.05","0.1","0.15","0.2","0.25","0.3","0.35","0.4","0.45","0.5","1.0","1.5","2.0","2.5","3.0","3.5","4.0","4.5","5.0","5.5","6.0","6.5","7.0","7.5","8.0","8.5","9.0","9.5","10.0","10.5","11.0","11.5","12.0","12.5","13.0","13.5","14.0","14.5","15.0","15.5","16.0","16.5","17.0","17.5","18.0","18.5","19.0","19.5","20.0","20.5","21.0","21.5","22.0","22.5","23.0","23.5","24.0")
+
+
+Vds<-as.numeric(Vds)
+Vgs_col<-rep(Vgs,each =length(Vds))
+Vds_col<- rep(Vds,times=length(Vgs))
+modeloRTH1<-data.frame(Vgs=Vgs_col,Vds=Vds_col)  
+
+modeloRTH1$Vds=as.numeric(modeloRTH1$Vds)
+modeloRTH1$Vgs=as.numeric(modeloRTH1$Vgs)
+
+
+
+#Voy a plotear los datos
+
+plot_ly(data=modeloRTH,x=~Vds,y=~Id,mode='markers+lines',type = "scatter", split=~Vgs)%>%
+    layout(title = "Modelo RTH",
+                xaxis = list(title = "Vds (V)"),
+                yaxis = list(title = "Id (A/m)"))
+  
+
+plot_ly(data=modeloRTH,x=~Vds,y=~temperatura,mode='markers+lines',type = "scatter", split=~Vgs)%>%
+    layout(title = "Modelo RTH",
+                xaxis = list(title = "Vds (V)"),
+                yaxis = list(title = "Temperatura(K)"))
+
+
+
+
+Rth=5/1000
+T0=300
+error=0.001
+modulacion=0.3
+
+#para el TRM1
+    modeloRTH1$IDcalculada<-NA
+    modeloRTH1$temperaturacalculada<-NA
+#Normalizamos la entrada para entrenar la red y calcular I
+     modeloRTH1norm<-modeloRTH1
+     modeloRTH1norm$Vgs<-(modeloRTH1$Vgs-minVgs)/(maxVgs-minVgs)
+    modeloRTH1norm$Vds<-(modeloRTH1$Vds-minVds)/(maxVds-minVds)
+    #modeloRTH1norm$Id<-(modeloRTH1$Id-minId)/(maxId-minId)
+    #modeloRTH1norm$temperatura<-(modeloRTH1$temperatura-mintemp)/(maxtemp-mintemp)
+
+for(j in 1:nrow(modeloRTH1norm)){
+  T_latt<-T0
+  T_latt_new<-T_latt+0.1
+print(j)
+while(abs(T_latt_new-T_latt)>error) {
+  #Actualizamos para siguiente iteración
+  T_latt<-T_latt_new
+  T_latt_norm<-(T_latt-mintemp)/(maxtemp-mintemp)
+  entrada<-c(modeloRTH1norm$Vds[j],modeloRTH1norm$Vgs[j],T_latt_norm)
+  calcular<-as.data.frame(t(entrada))
+    #Calculamos I con la red neuronal
+    I_pred<-predict(model_rnn, newdata=calcular)
+    #la desnormalizamos
+    I<-I_pred*(maxId-minId)+minId
+    
+    
+    #Cálculo la potencia disipada
+    Pdiss<-I*modeloRTH1[j,2]
+
+    #Actualizamos T_latt según el modelo térmico TRM1
+    T_latt_new<-T0+Pdiss*Rth
+    
+    
+    
+    incremento<-abs(T_latt_new-T_latt)
+    if(T_latt_new>T_latt){
+      T_latt_new<-T_latt+incremento*modulacion
+    }
+    if(T_latt_new<T_latt){
+      T_latt_new<-T_latt-incremento*modulacion
+    }
+    
+    
+
+}
+  modeloRTH1$IDcalculada[j]<-I
+    modeloRTH1$temperaturacalculada[j]<-T_latt_new
+}
+    
+#vamos a plotear los resultados comparando con lo que debería salir
+    
+  modeloRTH$Vgs=as.character(modeloRTH$Vgs)
+  modeloRTH1$Vgs=as.character(modeloRTH1$Vgs)
+ plot_ly()%>%
+    add_trace(data=modeloRTH1,x=~Vds,y=~IDcalculada,mode='lines',type = "scatter", color=~Vgs)%>%
+    add_trace(data = modeloRTH, x = ~Vds, y = ~Id, mode = 'markers', type = 'scatter',color=~Vgs) %>%
+    layout(title =list(text= "TRM-1",font=(list(size=16))),
+                xaxis = list(title = "Vds (V)",titlefont = list(size = 16), tickfont = list(size = 16)),
+                yaxis = list(title = "Id (A/m)",titlefont = list(size = 16), tickfont = list(size = 16)),
+           legend = list(
+        title = list(text = "  Vgs (V) ", font = list(size = 14)),font = list(size = 12),x = 1.05, y = 1,
+        bgcolor = '#F9F9F9',bordercolor = '#ccc',borderwidth = 1),
+        annotations = list(
+  list(
+    x = 0.05,
+    y = 1.05,
+    text = "   (a)   Rth = 5.0 K·mm/W ",
+    xref = "paper", yref = "paper",  # posiciona con relación al gráfico
+    showarrow = FALSE,
+    font = list(size = 16)
+  )
+             )
+             )
+ 
+  plot_ly()%>%
+    add_trace(data=modeloRTH1,x=~Vds,y=~temperaturacalculada,mode='lines',type = "scatter", color=~Vgs)%>%
+    add_trace(data = modeloRTH, x = ~Vds, y = ~temperatura, mode = 'markers', type = 'scatter',color=~Vgs) %>%
+    layout(title =list(text= "TRM-1",font=(list(size=16))),
+                xaxis = list(title = "Vds (V)",titlefont = list(size = 16), tickfont = list(size = 16)),
+                yaxis = list(title = "Tlatt (K)",titlefont = list(size = 16), tickfont = list(size = 16)),
+           legend = list(
+        title = list(text = "  Vgs (V) ", font = list(size = 14)),font = list(size = 12),x = 1.05, y = 1,
+        bgcolor = '#F9F9F9',bordercolor = '#ccc',borderwidth = 1),
+        annotations = list(
+  list(
+    x = 0.05,
+    y = 1.05,
+    text = "   (b)  Rth = 5.0 K·mm/W ",
+    xref = "paper", yref = "paper",  # posiciona con relación al gráfico
+    showarrow = FALSE,
+    font = list(size = 16)
+  )
+             )
+             )
+
+
+```
+
+```{r modelo hibrido kirchoff}
+#cargo los datos de los ficheros que tienen los datos con las simulaciones MC
+kirchoff<-read.csv("C:/Users/Asus/OneDrive/Desktop/Doble grado física y mates/Quinto/Segundo cuatrimestre/Tfg Física/Kirchoff",header=TRUE,sep=";")
+kirchoff$Vds=as.numeric(kirchoff$Vds)
+kirchoff$Vgs=as.numeric(kirchoff$Vgs)
+kirchoff$temperatura=as.numeric((kirchoff$temperatura))
+kirchoff$Id=as.numeric((kirchoff$Id))
+
+
+Vgs<-c(-1,-2,-3,-4)
+Vds<-c("0.0","0.05","0.1","0.15","0.2","0.25","0.3","0.35","0.4","0.45","0.5","1.0","1.5","2.0","2.5","3.0","3.5","4.0","4.5","5.0","5.5","6.0","6.5","7.0","7.5","8.0","8.5","9.0","9.5","10.0","10.5","11.0","11.5","12.0","12.5","13.0","13.5","14.0","14.5","15.0","15.5","16.0","16.5","17.0","17.5","18.0","18.5","19.0","19.5","20.0","20.5","21.0","21.5","22.0","22.5","23.0","23.5","24.0")
+
+
+Vds<-as.numeric(Vds)
+Vgs_col<-rep(Vgs,each =length(Vds))
+Vds_col<- rep(Vds,times=length(Vgs))
+kirchoff1<-data.frame(Vgs=Vgs_col,Vds=Vds_col)  
+
+kirchoff1$Vds=as.numeric(kirchoff1$Vds)
+kirchoff1$Vgs=as.numeric(kirchoff1$Vgs)
+
+#ploteamos los datos 
+plot_ly(data=kirchoff,x=~Vds,y=~Id,mode='markers+lines',type = "scatter", split=~Vgs)%>%
+    layout(title = "Kirchoff",
+                xaxis = list(title = "Vds (V)"),
+                yaxis = list(title = "Id (A/m)"))
+ 
+plot_ly(data=kirchoff,x=~Vds,y=~temperatura,mode='markers+lines',type = "scatter", split=~Vgs)%>%
+    layout(title = "Kirchoff",
+                xaxis = list(title = "Vds (V)"),
+                yaxis = list(title = "Temperatura(K)"))
+
+Rth=5/1000
+alpha_eff=2
+T0=300
+error=0.001
+modulacion=0.3
+
+
+#para el TRM2
+  kirchoff1$IDcalculada<-NA
+    kirchoff1$temperaturacalculada<-NA
+#Normalizamos la entrada para entrenar la red y calcular I
+    kirchoff1norm<-kirchoff1
+    kirchoff1norm$Vds<-(kirchoff1$Vds-minVds)/(maxVds-minVds)
+    kirchoff1norm$Vgs<-(kirchoff1$Vgs-minVgs)/(maxVgs-minVgs)
+    #kirchoffnorm$Id<-(kirchoff$Id-minId)/(maxId-minId)
+    #kirchoffnorm$temperatura<-(kirchoff$temperatura-mintemp)/(maxtemp-mintemp)
+
+for(j in 1:nrow(kirchoff1norm)){
+  T_latt<-T0
+  T_latt_new<-T_latt+0.1
+
+while(abs(T_latt_new-T_latt)>error) {
+   #Actualizamos para siguiente iteración
+
+  T_latt<-T_latt_new
+  T_latt_norm<-(T_latt-mintemp)/(maxtemp-mintemp)
+  entrada<-c(kirchoff1norm$Vds[j],kirchoff1norm$Vgs[j],T_latt_norm)
+  calcular<-as.data.frame(t(entrada))
+    #Calculamos I con la red neuronal
+    I_pred<-predict(model_rnn, newdata=calcular)
+    I<-I_pred*(maxId-minId)+minId
+    
+    
+    #Cálculo la potencia disipada
+    Pdiss<-I*kirchoff1[j,2]
+
+    #Actualizamos T_latt según el modelo térmico TRM1
+    T_latt_new<-T0*(1+(Pdiss*Rth*(1-alpha_eff))/(T0))^(1/(1-alpha_eff))
+    
+    
+    
+    incremento<-abs(T_latt_new-T_latt)
+    if(T_latt_new>T_latt){
+      T_latt_new<-T_latt+incremento*modulacion
+    }
+    if(T_latt_new<T_latt){
+      T_latt_new<-T_latt-incremento*modulacion
+    }
+    
+    
+}
+  kirchoff1$IDcalculada[j]<-I
+    kirchoff1$temperaturacalculada[j]<-T_latt_new
+}
+    
+#vamos a plotear los resultados comparando con lo que debería salir
+kirchoff$Vgs=as.character(kirchoff$Vgs)
+kirchoff1$Vgs=as.character(kirchoff1$Vgs)
+ plot_ly()%>%
+    add_trace(data=kirchoff1,x=~Vds,y=~IDcalculada,mode='lines',type = "scatter", color=~Vgs)%>%
+    add_trace(data = kirchoff, x = ~Vds, y = ~Id, mode = 'markers', type = 'scatter',color=~Vgs) %>%
+    layout(title =list(text= "TRM-2",font=(list(size=16))),
+                xaxis = list(title = "Vds (V)",titlefont = list(size = 16), tickfont = list(size = 16)),
+                yaxis = list(title = "Id (A/m)",titlefont = list(size = 16), tickfont = list(size = 16)),
+           legend = list(
+        title = list(text = "  Vgs (V) ", font = list(size = 14)),font = list(size = 12),x = 1.05, y = 1,
+        bgcolor = '#F9F9F9',bordercolor = '#ccc',borderwidth = 1),
+        
+        annotations = list(
+  list(
+    x = 1.05,
+    y = 1.05,
+    text = " (a)<br>Rth = 5.0 K·mm/W<br>α_eff = 2  ",
+    align="left",
+    xref = "paper", yref = "paper",  # posiciona con relación al gráfico
+    showarrow = FALSE,
+    font = list(size = 16)
+  )
+  
+             )
+             )
+ 
+  plot_ly()%>%
+    add_trace(data=kirchoff1,x=~Vds,y=~temperaturacalculada,mode='lines',type = "scatter", color=~Vgs)%>%
+    add_trace(data = kirchoff, x = ~Vds, y = ~temperatura, mode = 'markers', type = 'scatter',color=~Vgs) %>%
+    layout(title =list(text= "TRM-2",font=(list(size=16))),
+                xaxis = list(title = "Vds (V)",titlefont = list(size = 16), tickfont = list(size = 16)),
+                yaxis = list(title = "Tlatt (K)",titlefont = list(size = 16), tickfont = list(size = 16)),
+           legend = list(
+        title = list(text = "  Vgs (V) ", font = list(size = 14)),font = list(size = 12),x = 1.05, y = 1,
+        bgcolor = '#F9F9F9',bordercolor = '#ccc',borderwidth = 1),
+        
+        annotations = list(
+  list(
+    x = 0.1,
+    y = 1.05,
+    text = " (b)<br>Rth = 5.0 K·mm/W<br>α_eff = 2 ",
+    align="left",
+    xref = "paper", yref = "paper",  # posiciona con relación al gráfico
+    showarrow = FALSE,
+    font = list(size = 16)
+  )
+             )
+             )
+```
+
+```{r Calculo de resultados usando el tercer modelo térmico}
+Rth=1.2/1000
+beta=2
+T0=300
+deltaT0=20
+error=0.001
+modulacion=0.3
+
+#para el TRM3
+
+
+Vgs<-c(-1,-2,-3,-4)
+Vds<-c("0.0","0.05","0.1","0.15","0.2","0.25","0.3","0.35","0.4","0.45","0.5","1.0","1.5","2.0","2.5","3.0","3.5","4.0","4.5","5.0","5.5","6.0","6.5","7.0","7.5","8.0","8.5","9.0","9.5","10.0","10.5","11.0","11.5","12.0","12.5","13.0","13.5","14.0","14.5","15.0","15.5","16.0","16.5","17.0","17.5","18.0","18.5","19.0","19.5","20.0","20.5","21.0","21.5","22.0","22.5","23.0","23.5","24.0","24.5","25.0")
+
+
+Vds<-as.numeric(Vds)
+Vgs_col<-rep(Vgs,each =length(Vds))
+Vds_col<- rep(Vds,times=length(Vgs))
+TRM3<-data.frame(Vgs=Vgs_col,Vds=Vds_col)  
+
+TRM3$Vds=as.numeric(TRM3$Vds)
+TRM3$Vgs=as.numeric(TRM3$Vgs)
+
+#Normalizamos la entrada para entrenar la red y calcular I  
+
+TRM3norm<-TRM3
+TRM3norm$Vgs<-(TRM3$Vgs-minVgs)/(maxVgs-minVgs)
+TRM3norm$Vds<-(TRM3$Vds-minVds)/(maxVds-minVds)
+
+  for(k in 1:nrow(TRM3)){
+  T_latt<-T0
+  T_latt_new<-T_latt+0.1
+  while(abs(T_latt_new-T_latt)>error) {
+  #Actualizamos para siguiente iteración
+  T_latt<-T_latt_new
+  T_latt_norm<-(T_latt-mintemp)/(maxtemp-mintemp)
+  entrada<-c(TRM3norm$Vds[k],TRM3norm$Vgs[k],T_latt_norm)
+  calcular<-as.data.frame(t(entrada))
+    #Calculamos I con la red neuronal
+    I_pred<-predict(model_rnn, newdata=calcular)
+    I<-I_pred*(maxId-minId)+minId
+    #Cálculo la potencia disipada
+    Pdiss<-I*TRM3[k,2]
+    #Actualizamos T_latt según el modelo térmico TRM3
+    T_latt_new<-T0+Pdiss*Rth*(1+(Pdiss*Rth/deltaT0)^beta)
+    incremento<-abs(T_latt_new-T_latt)
+    if(T_latt_new>T_latt){
+      T_latt_new<-T_latt+incremento*modulacion
+    }
+    if(T_latt_new<T_latt){
+      T_latt_new<-T_latt-incremento*modulacion
+    }
+    
+}
+  TRM3$Id1[k]<-I
+  TRM3$temperatura1[k]<-T_latt_new
+  TRM3$diferencia1[k]<-abs(T_latt_new-T_latt)
+  TRM3$Pdiss1[k]<-Pdiss
+  TRM3$leyenda1 <- paste0(
+    "TRM-3: ",
+  "Vgs = ", TRM3$Vgs, " V "," β = ", 2
+  #," ΔT₀=",20,"K"
+)
+  }
+
+# cambiamos el beta
+Rth=1.2/1000
+beta=3
+T0=300
+deltaT0=20
+error=0.001
+modulacion=0.3
+
+  for(k in 1:nrow(TRM3)){
+  T_latt<-T0
+  T_latt_new<-T_latt+0.1
+  while(abs(T_latt_new-T_latt)>error) {
+  #Actualizamos para siguiente iteración
+  T_latt<-T_latt_new
+  T_latt_norm<-(T_latt-mintemp)/(maxtemp-mintemp)
+  entrada<-c(TRM3norm$Vds[k],TRM3norm$Vgs[k],T_latt_norm)
+  calcular<-as.data.frame(t(entrada))
+    #Calculamos I con la red neuronal
+    I_pred<-predict(model_rnn, newdata=calcular)
+    I<-I_pred*(maxId-minId)+minId
+    #Cálculo la potencia disipada
+    Pdiss<-I*TRM3[k,2]
+    #Actualizamos T_latt según el modelo térmico TRM3
+    T_latt_new<-T0+Pdiss*Rth*(1+(Pdiss*Rth/deltaT0)^beta)
+    incremento<-abs(T_latt_new-T_latt)
+    if(T_latt_new>T_latt){
+      T_latt_new<-T_latt+incremento*modulacion
+    }
+    if(T_latt_new<T_latt){
+      T_latt_new<-T_latt-incremento*modulacion
+    }
+    
+}
+  TRM3$Id2[k]<-I
+  TRM3$temperatura2[k]<-T_latt_new
+  TRM3$diferencia2[k]<-abs(T_latt_new-T_latt)
+  TRM3$Pdiss2[k]<-Pdiss
+  TRM3$leyenda2 <- paste0(
+    "TRM-3: ",
+  "Vgs = ", TRM3$Vgs, " V "," β = ", 3
+)
+  }
+
+# cambiamos el beta
+Rth=1.2/1000
+beta=4
+T0=300
+deltaT0=20
+error=0.001
+modulacion=0.3
+
+  for(k in 1:nrow(TRM3)){
+  T_latt<-T0
+  T_latt_new<-T_latt+0.1
+  while(abs(T_latt_new-T_latt)>error) {
+  #Actualizamos para siguiente iteración
+  T_latt<-T_latt_new
+  T_latt_norm<-(T_latt-mintemp)/(maxtemp-mintemp)
+  entrada<-c(TRM3norm$Vds[k],TRM3norm$Vgs[k],T_latt_norm)
+  calcular<-as.data.frame(t(entrada))
+    #Calculamos I con la red neuronal
+    I_pred<-predict(model_rnn, newdata=calcular)
+    I<-I_pred*(maxId-minId)+minId
+    #Cálculo la potencia disipada
+    Pdiss<-I*TRM3[k,2]
+    #Actualizamos T_latt según el modelo térmico TRM3
+    T_latt_new<-T0+Pdiss*Rth*(1+(Pdiss*Rth/deltaT0)^beta)
+    incremento<-abs(T_latt_new-T_latt)
+    if(T_latt_new>T_latt){
+      T_latt_new<-T_latt+incremento*modulacion
+    }
+    if(T_latt_new<T_latt){
+      T_latt_new<-T_latt-incremento*modulacion
+    }
+    
+}
+  TRM3$Id3[k]<-I
+  TRM3$temperatura3[k]<-T_latt_new
+  TRM3$diferencia3[k]<-abs(T_latt_new-T_latt)
+  TRM3$Pdiss3[k]<-Pdiss
+  TRM3$leyenda3 <- paste0(
+    "TRM-3: ",
+  "Vgs = ", TRM3$Vgs, " V "," β = ", 4
+)
+  }
+```
+
+
+```{r Calculo de resultados usando el primer modelo térmico}
+Rth=1.2/1000
+T0=300
+error=0.001
+modulacion=0.3
+
+#para el TRM1
+Vgs<-c(-1,-2,-3,-4)
+Vds<-c("0.0","0.05","0.1","0.15","0.2","0.25","0.3","0.35","0.4","0.45","0.5","1.0","1.5","2.0","2.5","3.0","3.5","4.0","4.5","5.0","5.5","6.0","6.5","7.0","7.5","8.0","8.5","9.0","9.5","10.0","10.5","11.0","11.5","12.0","12.5","13.0","13.5","14.0","14.5","15.0","15.5","16.0","16.5","17.0","17.5","18.0","18.5","19.0","19.5","20.0","20.5","21.0","21.5","22.0","22.5","23.0","23.5","24.0","24.5","25.0")
+
+
+Vds<-as.numeric(Vds)
+Vgs_col<-rep(Vgs,each =length(Vds))
+Vds_col<- rep(Vds,times=length(Vgs))
+TRM1<-data.frame(Vgs=Vgs_col,Vds=Vds_col)  
+
+TRM1$Vds=as.numeric(TRM3$Vds)
+TRM1$Vgs=as.numeric(TRM3$Vgs)
+
+
+TRM1norm<-TRM1
+TRM1norm$Vgs<-(TRM1$Vgs-minVgs)/(maxVgs-minVgs)
+TRM1norm$Vds<-(TRM1$Vds-minVds)/(maxVds-minVds)
+
+  for(k in 1:nrow(TRM1)){
+  T_latt<-T0
+  T_latt_new<-T_latt+0.1
+  while(abs(T_latt_new-T_latt)>error) {
+  #Actualizamos para siguiente iteración
+  T_latt<-T_latt_new
+  T_latt_norm<-(T_latt-mintemp)/(maxtemp-mintemp)
+  entrada<-c(TRM1norm$Vds[k],TRM1norm$Vgs[k],T_latt_norm)
+  calcular<-as.data.frame(t(entrada))
+    #Calculamos I con la red neuronal
+    I_pred<-predict(model_rnn, newdata=calcular)
+    I<-I_pred*(maxId-minId)+minId
+    #Cálculo la potencia disipada
+    Pdiss<-I*TRM1[k,2]
+    #Actualizamos T_latt según el modelo térmico TRM1
+    T_latt_new<-T0+Pdiss*Rth
+    incremento<-abs(T_latt_new-T_latt)
+    if(T_latt_new>T_latt){
+      T_latt_new<-T_latt+incremento*modulacion
+    }
+    if(T_latt_new<T_latt){
+      T_latt_new<-T_latt-incremento*modulacion
+    }
+    
+}
+  TRM1$Id1[k]<-I
+  TRM1$temperatura1[k]<-T_latt_new
+  TRM1$diferencia1[k]<-abs(T_latt_new-T_latt)
+  TRM1$Pdiss1[k]<-Pdiss
+  TRM1$leyenda <- paste0(
+  "TRM-1:",
+  "Vgs = ", TRM1$Vgs, " V"
+)
+  }
+```
+
+
+```{r Calculo de resultados usando el segundo modelo térmico}
+
+Rth=1.2/1000
+T0=300
+error=0.001
+modulacion=0.3
+alpha_eff=2
+
+#para el TRM2
+Vgs<-c(-1,-2,-3,-4)
+Vds<-c("0.0","0.05","0.1","0.15","0.2","0.25","0.3","0.35","0.4","0.45","0.5","1.0","1.5","2.0","2.5","3.0","3.5","4.0","4.5","5.0","5.5","6.0","6.5","7.0","7.5","8.0","8.5","9.0","9.5","10.0","10.5","11.0","11.5","12.0","12.5","13.0","13.5","14.0","14.5","15.0","15.5","16.0","16.5","17.0","17.5","18.0","18.5","19.0","19.5","20.0","20.5","21.0","21.5","22.0","22.5","23.0","23.5","24.0","24.5","25.0")
+
+
+Vds<-as.numeric(Vds)
+Vgs_col<-rep(Vgs,each =length(Vds))
+Vds_col<- rep(Vds,times=length(Vgs))
+TRM2<-data.frame(Vgs=Vgs_col,Vds=Vds_col)  
+
+TRM2$Vds=as.numeric(TRM3$Vds)
+TRM2$Vgs=as.numeric(TRM3$Vgs)
+
+
+TRM2norm<-TRM2
+TRM2norm$Vgs<-(TRM2$Vgs-minVgs)/(maxVgs-minVgs)
+TRM2norm$Vds<-(TRM2$Vds-minVds)/(maxVds-minVds)
+
+  for(k in 1:nrow(TRM2)){
+  T_latt<-T0
+  T_latt_new<-T_latt+0.1
+  while(abs(T_latt_new-T_latt)>error) {
+  #Actualizamos para siguiente iteración
+  T_latt<-T_latt_new
+  T_latt_norm<-(T_latt-mintemp)/(maxtemp-mintemp)
+  entrada<-c(TRM2norm$Vds[k],TRM2norm$Vgs[k],T_latt_norm)
+  calcular<-as.data.frame(t(entrada))
+    #Calculamos I con la red neuronal
+    I_pred<-predict(model_rnn, newdata=calcular)
+    I<-I_pred*(maxId-minId)+minId
+    #Cálculo la potencia disipada
+    Pdiss<-I*TRM2[k,2]
+    #Actualizamos T_latt según el modelo térmico TRM2
+    T_latt_new<-T0*(1+(Pdiss*Rth*(1-alpha_eff))/(T0))^(1/(1-alpha_eff))
+    incremento<-abs(T_latt_new-T_latt)
+    if(T_latt_new>T_latt){
+      T_latt_new<-T_latt+incremento*modulacion
+    }
+    if(T_latt_new<T_latt){
+      T_latt_new<-T_latt-incremento*modulacion
+    }
+    
+}
+  TRM2$Id1[k]<-I
+  TRM2$temperatura1[k]<-T_latt_new
+  TRM2$diferencia1[k]<-abs(T_latt_new-T_latt)
+  TRM2$Pdiss1[k]<-Pdiss
+  TRM2$leyenda <- paste0(
+    "TRM-2:",
+  "Vgs = ", TRM2$Vgs, " V "," α_eff = ", 2
+)
+  }
+
+
+
+```
+```{r ploteamos todos los resultados}
+#vamos a plotear los resultados
+TRM3$Vgs=as.character(TRM3$Vgs)
+TRM1$Vgs=as.character(TRM1$Vgs)
+TRM2$Vgs=as.character(TRM2$Vgs)
+ plot_ly()%>%
+   add_trace(data=TRM3,x=~Vds,y=~Id1,mode='lines',type = "scatter", color=~Vgs,colors = 'Set1',hoverinfo = 'text',
+    text = ~leyenda1,split=~leyenda1)%>%
+   add_trace(data=TRM1,x=~Vds,y=~Id1,mode='markers+lines',type = "scatter",marker = list(symbol = 'x'), color=~Vgs,colors = 'Set1',hoverinfo = 'text',
+    text = ~leyenda,split=~leyenda)%>%
+   add_trace(data=TRM2,x=~Vds,y=~Id1,mode='markers+lines',type = "scatter",marker = list(symbol = 'diamond'), color=~Vgs,colors = 'Set1',hoverinfo = 'text',
+    text = ~leyenda,split=~leyenda)%>%
+    layout(
+                xaxis = list(title = "Vds (V)",titlefont = list(size = 16), tickfont = list(size = 16)),
+                yaxis = list(title = "Id (A/m)",titlefont = list(size = 16), tickfont = list(size = 16)),
+           legend = list(font = list(size = 12),x = 1.05, y = 1,
+        bgcolor = '#F9F9F9',bordercolor = '#ccc',borderwidth = 1),
+        
+        annotations = list(
+  list(
+    x = 0.1,
+    y = 1.05,
+    text = " (a) Rth=1.2 Kmm/W",
+    align="left",
+    xref = "paper", yref = "paper",  # posiciona con relación al gráfico
+    showarrow = FALSE,
+    font = list(size = 16)
+  )
+             ))
+  plot_ly()%>%
+    add_trace(data=TRM3,x=~Vds,y=~temperatura1,mode='lines',type = "scatter", color=~Vgs,colors = 'Set1',hoverinfo = 'text',
+    text = ~leyenda1,split=~leyenda1)%>%
+    add_trace(data=TRM1,x=~Vds,y=~temperatura1,mode='markers+lines',type = "scatter",marker = list(symbol = 'x'), color=~Vgs,colors = 'Set1',hoverinfo = 'text',
+    text = ~leyenda,split=~leyenda)%>%
+    add_trace(data=TRM2,x=~Vds,y=~temperatura1,mode='markers+lines',type = "scatter",marker = list(symbol = 'diamond'), color=~Vgs,colors = 'Set1',hoverinfo = 'text',
+    text = ~leyenda,split=~leyenda)%>%
+    layout(
+                xaxis = list(title = "Vds (V)",titlefont = list(size = 16), tickfont = list(size = 16)),
+                yaxis = list(title = "Tlatt (K)",titlefont = list(size = 16), tickfont = list(size = 16)),
+           legend = list(font = list(size =12),x = 1.05, y = 1,bgcolor = '#F9F9F9',bordercolor = '#ccc',borderwidth = 1),
+        
+        annotations = list(
+  list(
+    x = 0.1,
+    y = 1.05,
+    text = " (b) Rth=1.2 Kmm/W",
+    align="left",
+    xref = "paper", yref = "paper",  # posiciona con relación al gráfico
+    showarrow = FALSE,
+    font = list(size = 16)
+  )
+             ))
+
+
+    
+```
+```{r ploteamos solo para el tercero}
+TRM3$Vgs=as.character(TRM3$Vgs)
+
+ plot_ly()%>%
+   add_trace(data=TRM3,x=~Vds,y=~Id1,mode='lines',type = "scatter", color=~Vgs,colors = 'Set1',split=~leyenda1)%>%
+   add_trace(data=TRM3,x=~Vds,y=~Id2,mode='lines',type = "scatter",line = list(
+      dash = "dash"), color=~Vgs,colors = 'Set1',split=~leyenda2)%>%
+   add_trace(data=TRM3,x=~Vds,y=~Id3,mode='lines',type = "scatter",line = list(
+      dash = "dot"), color=~Vgs,colors = 'Set1',split=~leyenda3)%>%
+    layout(
+           title =list(text= "TRM-3",font=(list(size=16))),
+                xaxis = list(title = "Vds (V)",titlefont = list(size = 16), tickfont = list(size = 16)),
+                yaxis = list(title = "Id (A/m)",titlefont = list(size = 16), tickfont = list(size = 16)),
+           legend = list( font = list(size = 12),x = 1.05, y = 1,
+        bgcolor = '#F9F9F9',bordercolor = '#ccc',borderwidth = 1),
+        
+        annotations = list(
+  list(
+    x = 0.1,
+    y = 1.05,
+    text = " (a)    Rth =  1.2  Kmm/W<br> ΔT₀=20 K",
+    align="left",
+    xref = "paper", yref = "paper",  # posiciona con relación al gráfico
+    showarrow = FALSE,
+    font = list(size = 16)
+    
+  )
+             ))
+  plot_ly()%>%
+    add_trace(data=TRM3,x=~Vds,y=~temperatura1,mode='lines',type = "scatter", color=~Vgs,colors = 'Set1',split=~leyenda1)%>%
+    add_trace(data=TRM3,x=~Vds,y=~temperatura2,mode='lines',type = "scatter",line = list(
+      dash = "dash"), color=~Vgs,colors = 'Set1',split=~leyenda2)%>%
+    add_trace(data=TRM3,x=~Vds,y=~temperatura3,mode='lines',type = "scatter",line = list(
+      dash = "dot"), color=~Vgs,colors = 'Set1',split=~leyenda3)%>%
+    layout(
+           title =list(text= "TRM-3",font=(list(size=16))),
+                xaxis = list(title = "Vds (V)",titlefont = list(size = 16), tickfont = list(size = 16)),
+                yaxis = list(title = "Tlatt (K)",titlefont = list(size = 16), tickfont = list(size = 16)),
+           legend = list(font = list(size = 12),x = 1.05, y = 1,
+        bgcolor = '#F9F9F9',bordercolor = '#ccc',borderwidth = 1),
+        
+        annotations = list(
+  list(
+    x = 0.1,
+    y = 1.05,
+    text = " (b)    Rth =  1.2  Kmm/W<br>ΔT₀=20 K",
+    align="left",
+    xref = "paper", yref = "paper",  # posiciona con relación al gráfico
+    showarrow = FALSE,
+    font = list(size = 16)
+  )
+             ))
+```
+
+```{r gráfico barras para comparar todas las métricas}
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+
+# Datos de la tabla
+datos <- data.frame(
+  Modelo = rep(c("Regresion lineal", "Random Forest", "Red neuronal")),
+  Fase = rep(c("Validación"), times = 3),
+  RMSE = c( 0.0995, 0.0213, 0.00125),
+  MAE = c( 0.0717, 0.0155, 0.00084),
+  R2 = c( 0.7984, 0.9908, 0.99996)
+)
+datos <- datos %>%
+  mutate(
+    Modelo = factor(Modelo, levels = c("Regresion lineal", "Random Forest", "Red neuronal")),
+    ModeloFase = paste(Modelo, Fase, sep = " - "),
+    ModeloFase = factor(ModeloFase, levels = c(
+      "Regresion lineal - Validación",
+      "Random Forest - Validación",
+      "Red neuronal - Validación"
+    ))
+  )
+# Reorganizar los datos para ggplot
+datos_largos <- datos %>%
+  pivot_longer(cols = c(RMSE, MAE, R2), names_to = "Métrica", values_to = "Valor")
+ggplot(datos_largos, aes(x = ModeloFase, y = Valor, fill = Modelo)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7)) +
+  facet_wrap(~Métrica, scales = "free_y") +
+  labs(
+    title = "Comparativa de métricas",
+    x = "Modelo",
+    y = "Valor de la métrica"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 70, hjust = 1),
+    text = element_text(size = 10)
+  ) +
+  scale_fill_brewer(palette = "Set2")
+
+
+```
+```{r comparativa para las métricas con diferentes porcentajes de datos de entrenamiento}
+set.seed(123)  # Fijamos la semilla para reproducibilidad
+#para un 50%
+n <- nrow(tablanorm)
+indices_50 <- sample(1:n, size = 0.5 * n)
+
+# Crear la tabla con el 80% de los datos
+train50<- tablanorm[indices_50, ]
+
+#Creamos la tabla con el 20%restante
+test50<-tablanorm[-indices_50,]
+
+set.seed(123)
+#Entrenamos nuestra red neuronal
+model_rnn50<-neuralnet(Id~.,train50,hidden=c(10,10,10),threshold=0.003,stepmax=1e+06)
+#redneuronal <- neuralnet(Id ~ Vds+temperatura+Vgs, train, hidden = c(10,10,10), threshold=0.001,stepmax=1e+06,linear.output = TRUE,rep=3,lifesign = "full")
+#linear.output=TRUE asumimos que Id es continua y se ha escogido el número de neuronas como 3 veces las entradas + la salida y usamos tres capas
+
+#plotear la red
+#plot(model_rnn,rep = "best")
+
+#para hacer predicciones con el paquete neuralnet debemos usar compute no predict
+
+tablanorm$prediccionesredneuronal50 <- NA 
+tablanorm$prediccionesredneuronal50[-indices_50] <-predict(model_rnn50,newdata = test50)
+tablanorm$prediccionesredneuronal50[indices_50] <-predict(model_rnn50,newdata=train50)
+
+#cálculo de las métricas
+MAEtrain<-mean(abs(train50$Id-tablanorm$prediccionesredneuronal50[indices_50]))
+RMSEtrain<-sqrt(mean((train50$Id-tablanorm$prediccionesredneuronal50[indices_50])^2))
+MAEtest<-mean(abs(test50$Id-tablanorm$prediccionesredneuronal50[-indices_50]))
+RMSEtest<-sqrt(mean((test50$Id-tablanorm$prediccionesredneuronal50[-indices_50])^2))
+coeficienteR2train<-1-(sum((train50$Id - tablanorm$prediccionesredneuronal50[indices_50])^2)/sum((train50$Id - mean(train50$Id))^2))
+coeficienteR2test<-1-(sum((test50$Id - tablanorm$prediccionesredneuronal50[-indices_50])^2)/sum((test50$Id - mean(test50$Id))^2))
+
+#comparación del testeo y del train
+ggplot(data = NULL, aes(x = train50$Id, y = tablanorm$prediccionesredneuronal50[indices_50])) +
+  geom_point(size = 0.5) +geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red", size = 0.8)+
+  labs(title = "Testeo datos TRAIN", x = "Corriente MC normalizada", y = "Corriente red neuronal normalizada") + annotate("text", x = 0.05, y = 1.05, label = " (a)  ", size = 6,hjust = 0, vjust = 1, fontface = "bold", color = "black")+
+  theme(axis.text = element_text(size = 14), 
+    axis.title = element_text(size=16),
+    plot.title = element_text(size = 18),
+    panel.background = element_rect(fill = "white"),    
+    plot.background = element_rect(fill = "white"),     
+    panel.grid.major = element_line(color = "grey90"))
+ggplot(data = NULL, aes(x = test50$Id, y = tablanorm$prediccionesredneuronal50[-indices_50])) +
+  geom_point(size = 0.5) +geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red", size = 0.8)+
+  labs(title = "Testeo datos TEST", x = "Corriente MC normalizada", y = "Corriente red neuronal normalizada") +annotate("text", x = 0.05, y = 1.05, label = " (b)  ", size = 6,hjust = 0, vjust = 1, fontface = "bold", color = "black")+
+  theme(axis.text = element_text(size = 14), 
+    axis.title = element_text(size=16),
+    plot.title = element_text(size = 18),
+    panel.background = element_rect(fill = "white"),    
+    plot.background = element_rect(fill = "white"),     
+    panel.grid.major = element_line(color = "grey90"))
+
+```
+```{r}
+set.seed(123)  # Fijamos la semilla para reproducibilidad
+#para un 50%
+n <- nrow(tablanorm)
+indices_10 <- sample(1:n, size = 0.1 * n)
+
+# Crear la tabla con el 80% de los datos
+train10<- tablanorm[indices_10, ]
+
+#Creamos la tabla con el 20%restante
+test10<-tablanorm[-indices_10,]
+
+set.seed(123)
+#Entrenamos nuestra red neuronal
+model_rnn10<-neuralnet(Id~.,train10,hidden=c(10,10,10),threshold=0.003,stepmax=1e+06)
+#redneuronal <- neuralnet(Id ~ Vds+temperatura+Vgs, train, hidden = c(10,10,10), threshold=0.001,stepmax=1e+06,linear.output = TRUE,rep=3,lifesign = "full")
+#linear.output=TRUE asumimos que Id es continua y se ha escogido el número de neuronas como 3 veces las entradas + la salida y usamos tres capas
+
+#plotear la red
+#plot(model_rnn,rep = "best")
+
+#para hacer predicciones con el paquete neuralnet debemos usar compute no predict
+
+tablanorm$prediccionesredneuronal10 <- NA 
+tablanorm$prediccionesredneuronal10[-indices_10] <-predict(model_rnn10,newdata = test10)
+tablanorm$prediccionesredneuronal10[indices_10] <-predict(model_rnn10,newdata=train10)
+
+#cálculo de las métricas
+MAEtrain<-mean(abs(train10$Id-tablanorm$prediccionesredneuronal10[indices_10]))
+RMSEtrain<-sqrt(mean((train10$Id-tablanorm$prediccionesredneuronal10[indices_10])^2))
+MAEtest<-mean(abs(test10$Id-tablanorm$prediccionesredneuronal10[-indices_10]))
+RMSEtest<-sqrt(mean((test10$Id-tablanorm$prediccionesredneuronal10[-indices_10])^2))
+coeficienteR2train<-1-(sum((train10$Id - tablanorm$prediccionesredneuronal10[indices_10])^2)/sum((train10$Id - mean(train10$Id))^2))
+coeficienteR2test<-1-(sum((test10$Id - tablanorm$prediccionesredneuronal10[-indices_10])^2)/sum((test10$Id - mean(test10$Id))^2))
+#comparación del testeo y del train
+ggplot(data = NULL, aes(x = train10$Id, y = tablanorm$prediccionesredneuronal10[indices_10])) +
+  geom_point(size = 0.5) +geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red", size = 0.8)+
+  labs(title = "Testeo datos TRAIN", x = "Corriente MC normalizada", y = "Corriente red neuronal normalizada") + annotate("text", x = 0.05, y = 1.05, label = " (a)  ", size = 6,hjust = 0, vjust = 1, fontface = "bold", color = "black")+
+  theme(axis.text = element_text(size = 14), 
+    axis.title = element_text(size=16),
+    plot.title = element_text(size = 18),
+    panel.background = element_rect(fill = "white"),    
+    plot.background = element_rect(fill = "white"),     
+    panel.grid.major = element_line(color = "grey90"))
+ggplot(data = NULL, aes(x = test10$Id, y = tablanorm$prediccionesredneuronal10[-indices_10])) +
+  geom_point(size = 0.5) +geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red", size = 0.8)+
+  labs(title = "Testeo datos TEST", x = "Corriente MC normalizada", y = "Corriente red neuronal normalizada") +annotate("text", x = 0.05, y = 1.05, label = " (b)  ", size = 6,hjust = 0, vjust = 1, fontface = "bold", color = "black")+
+  theme(axis.text = element_text(size = 14), 
+    axis.title = element_text(size=16),
+    plot.title = element_text(size = 18),
+    panel.background = element_rect(fill = "white"),    
+    plot.background = element_rect(fill = "white"),     
+    panel.grid.major = element_line(color = "grey90"))
+
+```
+```{r}
+set.seed(123)  # Fijamos la semilla para reproducibilidad
+#para un 50%
+n <- nrow(tablanorm)
+indices_1 <- sample(1:n, size = 0.01 * n)
+
+# Crear la tabla con el 80% de los datos
+train1<- tablanorm[indices_1, ]
+
+#Creamos la tabla con el 20%restante
+test1<-tablanorm[-indices_1,]
+
+set.seed(123)
+#Entrenamos nuestra red neuronal
+model_rnn1<-neuralnet(Id~.,train1,hidden=c(10,10,10),threshold=0.003,stepmax=1e+06)
+#redneuronal <- neuralnet(Id ~ Vds+temperatura+Vgs, train, hidden = c(10,10,10), threshold=0.001,stepmax=1e+06,linear.output = TRUE,rep=3,lifesign = "full")
+#linear.output=TRUE asumimos que Id es continua y se ha escogido el número de neuronas como 3 veces las entradas + la salida y usamos tres capas
+
+#plotear la red
+#plot(model_rnn,rep = "best")
+
+#para hacer predicciones con el paquete neuralnet debemos usar compute no predict
+
+tablanorm$prediccionesredneuronal1 <- NA 
+tablanorm$prediccionesredneuronal1[-indices_1] <-predict(model_rnn1,newdata = test1)
+tablanorm$prediccionesredneuronal1[indices_1] <-predict(model_rnn1,newdata=train1)
+
+#cálculo de las métricas
+MAEtrain<-mean(abs(train1$Id-tablanorm$prediccionesredneuronal1[indices_1]))
+RMSEtrain<-sqrt(mean((train1$Id-tablanorm$prediccionesredneuronal1[indices_1])^2))
+MAEtest<-mean(abs(test1$Id-tablanorm$prediccionesredneuronal1[-indices_1]))
+RMSEtest<-sqrt(mean((test1$Id-tablanorm$prediccionesredneuronal1[-indices_1])^2))
+coeficienteR2train<-1-(sum((train1$Id - tablanorm$prediccionesredneuronal1[indices_1])^2)/sum((train1$Id - mean(train1$Id))^2))
+coeficienteR2test<-1-(sum((test1$Id - tablanorm$prediccionesredneuronal1[-indices_1])^2)/sum((test1$Id - mean(test1$Id))^2))
+#comparación del testeo y del train
+ggplot(data = NULL, aes(x = train1$Id, y = tablanorm$prediccionesredneuronal1[indices_1])) +
+  geom_point(size = 0.5) +geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red", size = 0.8)+
+  labs(title = "Testeo datos TRAIN", x = "Corriente MC normalizada", y = "Corriente red neuronal normalizada") + annotate("text", x = 0.05, y = 1.05, label = " (a)  ", size = 6,hjust = 0, vjust = 1, fontface = "bold", color = "black")+
+  theme(axis.text = element_text(size = 14), 
+    axis.title = element_text(size=16),
+    plot.title = element_text(size = 18),
+    panel.background = element_rect(fill = "white"),    
+    plot.background = element_rect(fill = "white"),     
+    panel.grid.major = element_line(color = "grey90"))
+ggplot(data = NULL, aes(x = test1$Id, y = tablanorm$prediccionesredneuronal1[-indices_1])) +
+  geom_point(size = 0.5) +geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red", size = 0.8)+
+  labs(title = "Testeo datos TEST", x = "Corriente MC normalizada", y = "Corriente red neuronal normalizada") +annotate("text", x = 0.05, y = 1.05, label = " (b)  ", size = 6,hjust = 0, vjust = 1, fontface = "bold", color = "black")+
+  theme(axis.text = element_text(size = 14), 
+    axis.title = element_text(size=16),
+    plot.title = element_text(size = 18),
+    panel.background = element_rect(fill = "white"),    
+    plot.background = element_rect(fill = "white"),     
+    panel.grid.major = element_line(color = "grey90"))
+
+```
+```{r}
+set.seed(123)  # Fijamos la semilla para reproducibilidad
+#para un 50%
+n <- nrow(tablanorm)
+indices_01 <- sample(1:n, size = 0.001 * n)
+
+# Crear la tabla con el 80% de los datos
+train01<- tablanorm[indices_01, ]
+
+#Creamos la tabla con el 20%restante
+test01<-tablanorm[-indices_01,]
+
+set.seed(123)
+#Entrenamos nuestra red neuronal
+model_rnn01<-neuralnet(Id~.,train1,hidden=c(10,10,10),threshold=0.003,stepmax=1e+06)
+#redneuronal <- neuralnet(Id ~ Vds+temperatura+Vgs, train, hidden = c(10,10,10), threshold=0.001,stepmax=1e+06,linear.output = TRUE,rep=3,lifesign = "full")
+#linear.output=TRUE asumimos que Id es continua y se ha escogido el número de neuronas como 3 veces las entradas + la salida y usamos tres capas
+
+#plotear la red
+#plot(model_rnn,rep = "best")
+
+#para hacer predicciones con el paquete neuralnet debemos usar compute no predict
+
+tablanorm$prediccionesredneuronal01 <- NA 
+tablanorm$prediccionesredneuronal01[-indices_01] <-predict(model_rnn01,newdata = test01)
+tablanorm$prediccionesredneuronal01[indices_01] <-predict(model_rnn01,newdata=train01)
+
+#cálculo de las métricas
+MAEtrain<-mean(abs(train01$Id-tablanorm$prediccionesredneuronal01[indices_01]))
+RMSEtrain<-sqrt(mean((train01$Id-tablanorm$prediccionesredneuronal01[indices_01])^2))
+MAEtest<-mean(abs(test01$Id-tablanorm$prediccionesredneuronal01[-indices_01]))
+RMSEtest<-sqrt(mean((test01$Id-tablanorm$prediccionesredneuronal01[-indices_01])^2))
+coeficienteR2train<-1-(sum((train01$Id - tablanorm$prediccionesredneuronal01[indices_01])^2)/sum((train01$Id - mean(train01$Id))^2))
+coeficienteR2test<-1-(sum((test01$Id - tablanorm$prediccionesredneuronal01[-indices_01])^2)/sum((test01$Id - mean(test01$Id))^2))
+#comparación del testeo y del train
+ggplot(data = NULL, aes(x = train01$Id, y = tablanorm$prediccionesredneuronal01[indices_01])) +
+  geom_point(size = 0.5) +geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red", size = 0.8)+
+  labs(title = "Testeo datos TRAIN", x = "Corriente MC normalizada", y = "Corriente red neuronal normalizada") + annotate("text", x = 0.05, y = 1.05, label = " (a)  ", size = 6,hjust = 0, vjust = 1, fontface = "bold", color = "black")+
+  theme(axis.text = element_text(size = 14), 
+    axis.title = element_text(size=16),
+    plot.title = element_text(size = 18),
+    panel.background = element_rect(fill = "white"),    
+    plot.background = element_rect(fill = "white"),     
+    panel.grid.major = element_line(color = "grey90"))
+ggplot(data = NULL, aes(x = test01$Id, y = tablanorm$prediccionesredneuronal01[-indices_01])) +
+  geom_point(size = 0.5) +geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red", size = 0.8)+
+  labs(title = "Testeo datos TEST", x = "Corriente MC normalizada", y = "Corriente red neuronal normalizada") +annotate("text", x = 0.05, y = 1.05, label = " (b)  ", size = 6,hjust = 0, vjust = 1, fontface = "bold", color = "black")+
+  theme(axis.text = element_text(size = 14), 
+    axis.title = element_text(size=16),
+    plot.title = element_text(size = 18),
+    panel.background = element_rect(fill = "white"),    
+    plot.background = element_rect(fill = "white"),     
+    panel.grid.major = element_line(color = "grey90"))
+
+```
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+# Datos originales
+datos <- data.frame(
+  Porcentaje = rep(c( 1, 10, 50, 80)),
+  Fase = rep(c( "Validación"), times = 4),
+  RMSE = c( #0.00585,
+            0.00487,
+            0.00213,
+            0.00143,
+            0.00125),
+  MAE = c( #0.00451,
+           0.00373,
+           0.00140,
+           0.00093,
+           0.00084),
+  R2 = c( #0.99929,
+          0.99951,
+          0.99991,
+          0.99995,
+          0.99996)
+)
+datos_largos <- datos %>%
+  pivot_longer(cols = c(RMSE, MAE, R2), names_to = "Métrica", values_to = "Valor")
+ggplot(datos_largos, aes(x = Porcentaje, y = Valor, color = Fase, group = Fase)) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  facet_wrap(~Métrica, scales = "free_y") +
+  labs(
+    title = "Evolución de métricas según % de datos de entrenamiento de la red neuronal",
+    x = "% de datos de entrenamiento",
+    y = "Valor de la métrica"
+  ) +
+  theme_minimal() +
+  scale_x_continuous(
+  breaks = c( 1, 10, 50, 80),
+  limits = c(0, 80)
+) +
+  theme(
+    text = element_text(size = 11),
+    strip.text = element_text(face = "bold"),
+    #axis.text.x = element_text(angle = 75, hjust = 1, vjust = 1, size = 11)
+  )
+
+```
+

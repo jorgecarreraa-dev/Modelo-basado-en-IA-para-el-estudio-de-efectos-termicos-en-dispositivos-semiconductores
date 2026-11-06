@@ -1304,7 +1304,7 @@ test01<-tablanorm[-indices_01,]
 
 set.seed(123)
 #Entrenamos nuestra red neuronal
-model_rnn01<-neuralnet(Id~.,train1,hidden=c(10,10,10),threshold=0.003,stepmax=1e+06)
+model_rnn01<-neuralnet(Id~.,train01,hidden=c(10,10,10),threshold=0.003,stepmax=1e+06)
 #redneuronal <- neuralnet(Id ~ Vds+temperatura+Vgs, train, hidden = c(10,10,10), threshold=0.001,stepmax=1e+06,linear.output = TRUE,rep=3,lifesign = "full")
 #linear.output=TRUE asumimos que Id es continua y se ha escogido el número de neuronas como 3 veces las entradas + la salida y usamos tres capas
 
